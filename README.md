@@ -1,6 +1,8 @@
-# Fitness YouTube Comment Classifier
+# Fitness YouTube Comment Classifier — RoBERTa
 
-Fine-tuned `distilbert-base-uncased` that classifies YouTube comments from fitness influencer videos into 5 categories: `fitness`, `nutrition`, `motivational`, `challenge`, `product`.
+Fine-tuned `roberta-base` that classifies YouTube comments from fitness influencer videos into 5 categories: `fitness`, `nutrition`, `motivational`, `challenge`, `product`.
+
+Part of a three-experiment study measuring the effect of data volume and model size on a self-scraped fitness influencer comment dataset.
 
 ---
 
@@ -11,21 +13,21 @@ from transformers import pipeline
 
 classifier = pipeline(
     'text-classification',
-    model='Krat6s/fitness-comment-classifier'
+    model='Krat6s/fitness-comment-classifier-roberta'
 )
 
 classifier("This protein shake changed my life, amazing with oat milk")
 # [{'label': 'nutrition', 'score': 0.956}]
 
-classifier("Day 7 of the squat challenge complete 🔥")
-# [{'label': 'challenge', 'score': 0.508}]
+classifier("I've been doing this workout for 30 days and I can see abs forming!")
+# [{'label': 'fitness', 'score': 0.965}]
 ```
 
 ---
 
 ## Model Description
 
-- **Base model:** `distilbert-base-uncased` (66M parameters)
+- **Base model:** `roberta-base` (FacebookAI, 125M parameters)
 - **Task:** Multi-class text classification (5 classes)
 - **Domain:** YouTube comments from fitness influencer channels
 - **Language:** English (non-English comments present in dataset but not handled)
@@ -36,8 +38,7 @@ classifier("Day 7 of the squat challenge complete 🔥")
 
 Self-scraped YouTube comments collected via the YouTube Data API v3 for MSc dissertation research on fitness influencer sentiment and thematic analysis.
 
-- **Total dataset size:** 92,223 comments
-- **YouTubers:** 94 fitness influencer channels
+- **Total dataset:** 92,223 comments across 94 fitness influencer channels
 - **Top channels:** Noel Deyzel, Browney, Jeff Nippard, Renaissance Periodization, ATHLEAN-X
 - **HuggingFace dataset:** [Krat6s/fitness-youtube-comments](https://huggingface.co/datasets/Krat6s/fitness-youtube-comments)
 
@@ -80,12 +81,12 @@ Self-scraped YouTube comments collected via the YouTube Data API v3 for MSc diss
 
 | Epoch | Train Loss | Val Loss | Accuracy | F1 |
 |-------|-----------|----------|----------|----|
-| 1 | 2.594 | 2.262 | 0.549 | 0.553 |
-| 2 | 2.037 | 2.150 | 0.581 | 0.583 |
-| 3 | 1.757 | 2.163 | 0.583 | 0.584 |
+| 1 | 2.495 | 2.126 | 0.592 | 0.595 |
+| 2 | 1.934 | 2.059 | 0.607 | 0.609 |
+| 3 | 1.638 | 2.102 | 0.614 | 0.614 |
 
-**Hardware:** Kaggle T4 x2 GPU  
-**Training time:** 327 seconds (~5.5 minutes)
+**Hardware:** Kaggle T4 x2 GPU
+**Training time:** 643 seconds (~10.7 minutes)
 
 ---
 
@@ -95,39 +96,57 @@ Self-scraped YouTube comments collected via the YouTube Data API v3 for MSc diss
 
 | Metric | Score |
 |--------|-------|
-| Accuracy | 60.4% |
-| F1 (weighted) | 60.4% |
+| Accuracy | 62.5% |
+| F1 (weighted) | 62.5% |
 
 ### Per-Class
 
 | Class | Precision | Recall | F1 | Support |
 |-------|-----------|--------|----|---------|
-| challenge | 0.61 | 0.58 | 0.60 | 685 |
-| fitness | 0.64 | 0.62 | 0.63 | 647 |
-| motivational | 0.53 | 0.64 | 0.58 | 641 |
-| nutrition | 0.64 | 0.62 | 0.63 | 671 |
-| product | 0.63 | 0.50 | 0.56 | 356 |
+| challenge | 0.62 | 0.58 | 0.60 | 685 |
+| fitness | 0.63 | 0.67 | 0.65 | 647 |
+| motivational | 0.56 | 0.66 | 0.61 | 641 |
+| nutrition | 0.69 | 0.65 | 0.67 | 671 |
+| product | 0.65 | 0.53 | 0.58 | 356 |
 
-### Baseline Comparison
+### Baseline Comparisons
 
 | Model | Accuracy |
 |-------|----------|
-| Majority class (always predict challenge) | 22.8% |
-| Fine-tuned DistilBERT (20K rows) | 60.4% |
-| Improvement | +37.6pp |
+| Majority class baseline | 22.8% |
+| Pretrained RoBERTa (no fine-tuning) | 21.6% |
+| Fine-tuned RoBERTa (this model) | 62.5% |
+| Improvement over baseline | +39.7pp |
+| Improvement from fine-tuning | +40.9pp |
 
 ---
 
-## Data Scaling Results
+## Experiment Comparison — Data Scaling + Model Scaling
 
-Trained two versions to measure the effect of data volume:
+Three experiments run on the same dataset and evaluation pipeline, changing one variable at a time.
 
-| Model | Training Data | Accuracy | F1 |
-|-------|--------------|----------|----|
-| DistilBERT | 5,000 rows | 53.6% | 53.8% |
-| DistilBERT | 20,000 rows | 60.4% | 60.4% |
+| Model | Parameters | Training Data | Accuracy | F1 | Train Time |
+|-------|-----------|--------------|----------|----|------------|
+| DistilBERT | 66M | 5,000 rows | 53.6% | 53.8% | 81s |
+| DistilBERT | 66M | 20,000 rows | 60.4% | 60.4% | 327s |
+| RoBERTa (this model) | 125M | 20,000 rows | 62.5% | 62.5% | 643s |
 
-4x more data produced +6.8pp accuracy improvement with linear increase in training time (81s → 327s).
+**Key findings:**
+- Data scaling (5K → 20K rows): +6.8pp accuracy, 4x training time
+- Model scaling (DistilBERT → RoBERTa): +2.1pp accuracy, 2x training time
+- Data volume had a larger impact than model size on this task
+
+---
+
+## Per-Class F1 Across All Experiments
+
+| Class | DistilBERT 5K | DistilBERT 20K | RoBERTa 20K |
+|-------|--------------|----------------|-------------|
+| challenge | 0.48 | 0.60 | 0.60 |
+| fitness | 0.54 | 0.63 | 0.65 |
+| motivational | 0.51 | 0.58 | 0.61 |
+| nutrition | 0.62 | 0.63 | 0.67 |
+| product | 0.54 | 0.56 | 0.58 |
 
 ---
 
@@ -136,45 +155,51 @@ Trained two versions to measure the effect of data volume:
 | Comment | Predicted | Confidence |
 |---------|-----------|------------|
 | "This protein shake recipe changed my life, tastes amazing with oat milk" | nutrition | 95.6% |
-| "I've been doing this workout for 30 days and I can see abs forming!" | fitness | 93.1% |
-| "Never give up on your dreams, the grind is worth it" | motivational | 79.8% |
-| "Is this pre-workout worth buying? I've heard mixed reviews" | product | 81.4% |
-| "Day 7 of the squat challenge complete 🔥" | challenge | 50.8% |
+| "I've been doing this workout for 30 days and I can see abs forming!" | fitness | 96.5% |
+| "Never give up on your dreams, the grind is worth it" | motivational | 86.0% |
+| "Is this pre-workout worth buying? I've heard mixed reviews" | product | 90.6% |
+| "Day 7 of the squat challenge complete 🔥" | fitness ✗ | 89.3% |
+
+Note: the final example is a known failure case. "Day 7 of the squat challenge" is correctly a challenge comment, but RoBERTa predicts fitness at high confidence. "Squat" has strong fitness associations in the training data. This illustrates a known failure mode of larger models — higher confidence on incorrect predictions. DistilBERT correctly predicted challenge here at lower confidence (50.8%).
 
 ---
 
 ## Limitations
 
-**Challenge/motivational confusion** is the largest source of error (136 challenge comments predicted as motivational in the 20K test set). Both classes share workout encouragement language. Without video context, the boundary is inherently ambiguous — this is a label ambiguity issue, not a data quantity issue. More training data did not reduce this confusion proportionally.
+**Challenge/motivational confusion** persists across all three model variants. 129 challenge comments were predicted as motivational in the test set despite the larger model and more training data. This is a label ambiguity problem intrinsic to the task — challenge and motivational videos share workout encouragement language. The confusion is not resolvable by more data or a larger model without incorporating video title or metadata alongside the comment text.
 
-**Product/nutrition overlap** is the second largest error pattern (64 nutrition comments predicted as product). Supplement and protein content sits on the boundary between these two classes.
+**Product class underrepresentation** — product has roughly half the examples of other classes. F1 of 0.58 is the lowest across classes despite competitive precision (0.65), driven by low recall (0.53) — the model misses nearly half of actual product comments.
 
-**Non-English comments** default to incorrect predictions. Approximately 15% of the full dataset contains non-English comments (Russian, German, Spanish, Korean). VADER assigned these neutral scores in the original dissertation — DistilBERT similarly has no signal for them.
+**High-confidence errors** — RoBERTa's stronger language associations produce higher confidence scores overall, including on incorrect predictions. The challenge → fitness misclassification at 89.3% confidence is an example.
 
-**Product class underrepresentation** — product has roughly half the examples of other classes in the full dataset. Despite this, product achieved competitive F1 (0.56) due to distinctive brand/review vocabulary.
+**Non-English comments** — approximately 15% of the dataset contains non-English comments. These produce unreliable predictions.
 
 ---
 
 ## Next Steps
 
-- Fine-tune `roberta-base` (125M parameters) on 20K rows — model size comparison
-- YouTuber-stratified train/test split — test generalisation to unseen creators
-- Sentiment classification using human-labelled subset replacing VADER baseline
+- YouTuber-stratified train/test split — train on 80 channels, test on 14 held-out channels to measure generalisation to unseen creators
+- Sentiment classification using human-labelled subset to replace VADER dissertation baseline
+- Incorporate video title as additional input feature to resolve challenge/motivational ambiguity
 
 ---
 
 ## Citation
 
-If you use this model or dataset, please credit:
-
 ```
 Dataset: Self-scraped YouTube comments from 94 fitness influencer channels
 Collected via YouTube Data API v3 for MSc dissertation research
-HuggingFace: Krat6s/fitness-youtube-comments
+HuggingFace dataset: Krat6s/fitness-youtube-comments
 ```
 
-## HuggingFace Links
-- https://huggingface.co/Krat6s/fitness-comment-classifier
-- https://huggingface.co/datasets/Krat6s/fitness-youtube-comments
+---
 
+## HuggingFace Roberta Fine-Tuned model link
+- https://huggingface.co/Krat6s/fitness-comment-classifier-roberta
+
+---
+
+## Related Models
+
+- [Krat6s/fitness-comment-classifier](https://huggingface.co/Krat6s/fitness-comment-classifier) — DistilBERT version trained on 20K rows (60.4% accuracy)
 
